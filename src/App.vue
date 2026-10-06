@@ -73,6 +73,12 @@ import { legalMoves } from './engine/moves'
 import type { ActivePiece } from './engine/types'
 
 // ------------
+// Turn
+// ------------
+
+const turn = ref<'w' | 'b'>('w')
+
+// ------------
 // Legal Moves
 // ------------
 
@@ -83,8 +89,10 @@ function maybeMovePiece(rowIndex: number, columnIndex: number, piece: string) {
     board.value[rowIndex]![columnIndex] = activePiece.value.piece
     board.value[activePiece.value.rowIndex]![activePiece.value.columnIndex] = ''
 
+    turn.value = turn.value === 'w' ? 'b' : 'w'
+
     activePiece.value = null
-  } else if (piece)
+  } else if (piece && piece.startsWith(turn.value))
     activePiece.value = { rowIndex: rowIndex, columnIndex: columnIndex, piece: piece }
 }
 
