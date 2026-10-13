@@ -69,22 +69,19 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { isPotentialMove, isActiveCell } from './engine/board'
-import { legalMoves } from './engine/moves'
+import { getSafeMoves, hasAnySafeMove, isInCheck } from './engine/moves'
 import type { ActivePiece } from './engine/types'
-
-// ------------
-// Turn
-// ------------
-
-const turn = ref<'w' | 'b'>('w')
 
 // ------------
 // Legal Moves
 // ------------
 
 const activePiece = ref<ActivePiece | null>(null)
+const turn = ref<'w' | 'b'>('w')
 
 function maybeMovePiece(rowIndex: number, columnIndex: number, piece: string) {
+  if (gameStatus.value !== 'playing') return
+
   if (activePiece.value && isPotentialMove(rowIndex, columnIndex, potentialMoves.value)) {
     board.value[rowIndex]![columnIndex] = activePiece.value.piece
     board.value[activePiece.value.rowIndex]![activePiece.value.columnIndex] = ''
@@ -97,8 +94,13 @@ function maybeMovePiece(rowIndex: number, columnIndex: number, piece: string) {
 }
 
 const potentialMoves = computed(() =>
-  activePiece.value ? legalMoves(activePiece.value, board.value) : [],
+  activePiece.value ? getSafeMoves(activePiece.value, board.value) : [],
 )
+
+const gameStatus = computed<'playing' | 'checkmate' | 'stalemate'>(() => {
+  if (hasAnySafeMove(board.value, turn.value)) return 'playing'
+  return isInCheck(board.value, turn.value) ? 'checkmate' : 'stalemate'
+})
 
 // ------------
 // Board
