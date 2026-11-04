@@ -1,6 +1,36 @@
 <template>
   <section class="container">
     <div class="board">
+      <div class="player-bar">
+        <img
+          class="player-avatar"
+          :src="getImageUrl('icons', 'deepJuice', 'png')"
+          alt="deepJuice"
+        />
+
+        <div>
+          <p class="player-name">Deep Juice</p>
+
+          <div class="captured-pieces">
+            <template v-for="(count, piece) in groupedCapturedPieces.b" :key="piece">
+              <div v-if="count" class="captured-group">
+                <img
+                  v-for="index in count"
+                  class="captured-piece"
+                  :key="index"
+                  :src="getImageUrl('piece', 'w' + piece.toUpperCase(), 'svg')"
+                  :alt="piece"
+                />
+              </div>
+            </template>
+
+            <span class="captured-score" v-if="capturedScores.b > capturedScores.w">
+              +{{ capturedScores.b - capturedScores.w }}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div class="row" v-for="(row, rowIndex) in board">
         <div
           class="square"
@@ -9,7 +39,37 @@
           @click="maybeMovePiece(rowIndex, columnIndex, piece)"
         >
           <div v-if="isPotentialMove(rowIndex, columnIndex, potentialMoves)" class="circle" />
-          <img class="piece" v-if="piece.length" :src="getImageUrl(piece)" :alt="piece" />
+          <img
+            class="piece"
+            v-if="piece.length"
+            :src="getImageUrl('piece', piece, 'svg')"
+            :alt="piece"
+          />
+        </div>
+      </div>
+
+      <div class="player-bar">
+        <img class="player-avatar" :src="getImageUrl('icons', 'guest', 'png')" alt="guest" />
+
+        <div>
+          <p class="player-name">Guest</p>
+          <div class="captured-pieces">
+            <template v-for="(count, piece) in groupedCapturedPieces.w" :key="piece">
+              <div v-if="count" class="captured-group">
+                <img
+                  v-for="index in count"
+                  class="captured-piece"
+                  :key="index"
+                  :src="getImageUrl('piece', 'b' + piece.toUpperCase(), 'svg')"
+                  :alt="piece"
+                />
+              </div>
+            </template>
+
+            <span class="captured-score" v-if="capturedScores.w > capturedScores.b">
+              +{{ capturedScores.w - capturedScores.b }}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -17,6 +77,10 @@
 </template>
 
 <style lang="css">
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
 .container {
   display: flex;
   align-items: center;
@@ -57,6 +121,48 @@
   height: 70px;
 }
 
+.captured-piece {
+  width: 25px;
+  height: 25px;
+}
+
+.captured-piece:not(:first-child) {
+  margin-left: -1rem;
+}
+
+.captured-pieces {
+  display: flex;
+  align-items: center;
+}
+
+.player-bar {
+  display: flex;
+  height: 45px;
+  margin: 0.5rem 0;
+}
+
+.player-avatar {
+  width: 45px;
+  height: 45px;
+  border-radius: 10%;
+}
+
+.player-name {
+  margin: 0 0 0 0.5rem;
+}
+
+.captured-group {
+  display: flex;
+}
+
+.captured-group:not(:first-child) {
+  margin-left: -0.25rem;
+}
+
+.captured-score {
+  color: #a9a9a9;
+}
+
 .circle {
   position: absolute;
   width: 20px;
@@ -71,6 +177,7 @@ import { computed, ref } from 'vue'
 import { isPotentialMove, isActiveCell } from './engine/board'
 import { getSafeMoves, hasAnySafeMove, isInCheck } from './engine/moves'
 import type { ActivePiece } from './engine/types'
+import { groupByType, getScore } from './engine/scores'
 
 // ------------
 // Legal Moves
@@ -83,7 +190,9 @@ function maybeMovePiece(rowIndex: number, columnIndex: number, piece: string) {
   if (gameStatus.value !== 'playing') return
 
   if (activePiece.value && isPotentialMove(rowIndex, columnIndex, potentialMoves.value)) {
-    board.value[rowIndex]![columnIndex] = activePiece.value.piece
+    maybeAssignCapturedPiece(rowIndex, columnIndex)
+
+    board.value[rowIndex]![columnIndex]! = activePiece.value.piece
     board.value[activePiece.value.rowIndex]![activePiece.value.columnIndex] = ''
 
     turn.value = turn.value === 'w' ? 'b' : 'w'
@@ -126,7 +235,32 @@ function boardBackground(
   else return (rowIndex + columnIndex) % 2 ? 'dark-cell' : 'light-cell'
 }
 
-function getImageUrl(name: string) {
-  return new URL(`./assets/piece/${name}.svg`, import.meta.url).href
+function getImageUrl(directory: string, name: string, format: string) {
+  return new URL(`./assets/${directory}/${name}.${format}`, import.meta.url).href
 }
+
+// ------------
+// Scores
+// ------------
+
+const capturedPieces = ref<Record<'w' | 'b', string[]>>({ w: [], b: [] })
+function maybeAssignCapturedPiece(rowIndex: number, columnIndex: number) {
+  if (board.value[rowIndex]![columnIndex]!.length) {
+    capturedPieces.value[turn.value].push(board.value[rowIndex]![columnIndex]!)
+  }
+}
+
+const groupedCapturedPieces = computed(() => {
+  return {
+    w: groupByType(capturedPieces.value.w),
+    b: groupByType(capturedPieces.value.b),
+  }
+})
+
+const capturedScores = computed(() => {
+  return {
+    w: getScore(groupedCapturedPieces.value.w),
+    b: getScore(groupedCapturedPieces.value.b),
+  }
+})
 </script>

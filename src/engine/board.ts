@@ -1,5 +1,4 @@
 import type { ActivePiece, Board, PotentialMoves } from './types'
-import { legalMoves } from './moves'
 
 // ------------
 // Helpers
