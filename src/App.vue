@@ -1,15 +1,28 @@
 <template>
   <section class="container">
+    <Modal v-if="promotionSquare" :closable="false">
+      <template #header>
+        <h3>Pawn Promotion</h3>
+      </template>
+
+      <div class="promotion-piece-container">
+        <img
+          class="promotion-piece"
+          v-for="piece in promotionPieces"
+          :key="piece"
+          :src="getImageUrl('piece', promotionSquare?.piece[0] + piece, 'svg')"
+          :alt="piece"
+          @click="promotePawn(piece, promotionSquare!)"
+        />
+      </div>
+    </Modal>
+
     <div class="board">
       <div class="player-bar">
-        <img
-          class="player-avatar"
-          :src="getImageUrl('icons', 'deepJuice', 'png')"
-          alt="deepJuice"
-        />
+        <img class="player-avatar" :src="getImageUrl('icons', 'player2', 'png')" alt="player 2" />
 
         <div>
-          <p class="player-name">Deep Juice</p>
+          <p class="player-name">Player 2</p>
 
           <div class="captured-pieces">
             <template v-for="(count, piece) in groupedCapturedPieces.b" :key="piece">
@@ -49,10 +62,10 @@
       </div>
 
       <div class="player-bar">
-        <img class="player-avatar" :src="getImageUrl('icons', 'guest', 'png')" alt="guest" />
+        <img class="player-avatar" :src="getImageUrl('icons', 'player1', 'png')" alt="player 1" />
 
         <div>
-          <p class="player-name">Guest</p>
+          <p class="player-name">Player 1</p>
           <div class="captured-pieces">
             <template v-for="(count, piece) in groupedCapturedPieces.w" :key="piece">
               <div v-if="count" class="captured-group">
@@ -93,6 +106,22 @@ body {
 
 .row {
   display: flex;
+}
+
+.promotion-piece-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.promotion-piece {
+  margin: 0.5rem;
+  transition: background-color 0.3s ease;
+}
+
+.promotion-piece:hover {
+  border-radius: 5px;
+  background-color: rgba(128, 128, 128, 0.5);
 }
 
 .square {
@@ -173,11 +202,12 @@ body {
 </style>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { isPotentialMove, isActiveCell } from './engine/board'
 import { getSafeMoves, hasAnySafeMove, isInCheck } from './engine/moves'
 import type { ActivePiece } from './engine/types'
 import { groupByType, getScore } from './engine/scores'
+import Modal from './components/Modal.vue'
 
 // ------------
 // Legal Moves
@@ -263,4 +293,23 @@ const capturedScores = computed(() => {
     b: getScore(groupedCapturedPieces.value.b),
   }
 })
+
+// ------------
+// Promotion
+// ------------
+const promotionPieces = ref<string[]>(['Q', 'R', 'N', 'B'])
+
+const promotionSquare = computed<ActivePiece | null>(() => {
+  const whiteColumn = board.value[0]!.indexOf('wP')
+  if (whiteColumn !== -1) return { rowIndex: 0, columnIndex: whiteColumn, piece: 'wP' }
+
+  const blackColumn = board.value[7]!.indexOf('bP')
+  if (blackColumn !== -1) return { rowIndex: 7, columnIndex: blackColumn, piece: 'bP' }
+
+  return null
+})
+
+function promotePawn(piece: string, square: ActivePiece) {
+  board.value[square.rowIndex]![square.columnIndex] = square.piece[0] + piece
+}
 </script>
