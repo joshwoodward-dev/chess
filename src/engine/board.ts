@@ -1,4 +1,4 @@
-import type { ActivePiece, Board, PotentialMoves } from './types'
+import type { ActivePiece, Board, GameState, PotentialMoves } from './types'
 
 // ------------
 // Helpers
@@ -40,5 +40,21 @@ export const isPotentialMove = (
 ): boolean => {
   return potentialMoves?.some(
     (move) => move.rowIndex === rowIndex && move.columnIndex === columnIndex,
+  )
+}
+
+export const pawnForwardRow = (activePiece: ActivePiece): number =>
+  activePiece.piece[0] === 'w' ? activePiece.rowIndex - 1 : activePiece.rowIndex + 1
+
+export const canCaptureEnPassant = (activePiece: ActivePiece, state: GameState): boolean => {
+  const enemyColour = activePiece.piece[0] === 'w' ? 'b' : 'w'
+  const rowIndex = pawnForwardRow(activePiece)
+
+  return (
+    state.enPassant !== null &&
+    state.board[activePiece.rowIndex]![state.enPassant.columnIndex]![0] === enemyColour &&
+    rowIndex === state.enPassant.rowIndex &&
+    (activePiece.columnIndex - 1 === state.enPassant.columnIndex ||
+      activePiece.columnIndex + 1 === state.enPassant.columnIndex)
   )
 }
