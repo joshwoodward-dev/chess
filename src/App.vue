@@ -44,7 +44,7 @@
         </div>
       </div>
 
-      <div class="row" v-for="(row, rowIndex) in board">
+      <div class="row" v-for="(row, rowIndex) in game.board">
         <div
           class="square"
           :class="boardBackground(rowIndex, columnIndex, activePiece)"
@@ -202,67 +202,50 @@ body {
 </style>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { isPotentialMove, isActiveCell } from './engine/board'
 import { getSafeMoves, hasAnySafeMove, isInCheck } from './engine/moves'
-import type { ActivePiece } from './engine/types'
+import type { ActivePiece, GameState } from './engine/types'
 import { groupByType, getScore } from './engine/scores'
 import Modal from './components/Modal.vue'
+import { initialState, makeMove } from './engine/state.ts'
 
 // ------------
-// Legal Moves
+// Game State
 // ------------
 
+const game = ref<GameState>(initialState())
 const activePiece = ref<ActivePiece | null>(null)
-const turn = ref<'w' | 'b'>('w')
 
 function maybeMovePiece(rowIndex: number, columnIndex: number, piece: string) {
   if (gameStatus.value !== 'playing') return
 
   if (activePiece.value && isPotentialMove(rowIndex, columnIndex, potentialMoves.value)) {
-    maybeAssignCapturedPiece(rowIndex, columnIndex)
-
-    board.value[rowIndex]![columnIndex]! = activePiece.value.piece
-    board.value[activePiece.value.rowIndex]![activePiece.value.columnIndex] = ''
-
-    turn.value = turn.value === 'w' ? 'b' : 'w'
-
+    const result = makeMove(game.value, activePiece.value, { rowIndex, columnIndex })
+    if (result.captured) capturedPieces.value[game.value.turn].push(result.captured)
+    game.value = result.state
     activePiece.value = null
-  } else if (piece && piece.startsWith(turn.value))
-    activePiece.value = { rowIndex: rowIndex, columnIndex: columnIndex, piece: piece }
+  } else if (piece && piece.startsWith(game.value.turn))
+    activePiece.value = { rowIndex, columnIndex, piece }
 }
 
 const potentialMoves = computed(() =>
-  activePiece.value ? getSafeMoves(activePiece.value, board.value) : [],
+  activePiece.value ? getSafeMoves(activePiece.value, game.value) : [],
 )
 
 const gameStatus = computed<'playing' | 'checkmate' | 'stalemate'>(() => {
-  if (hasAnySafeMove(board.value, turn.value)) return 'playing'
-  return isInCheck(board.value, turn.value) ? 'checkmate' : 'stalemate'
+  const { board, turn } = game.value
+  if (hasAnySafeMove(game.value, turn)) return 'playing'
+  return isInCheck(game.value, turn) ? 'checkmate' : 'stalemate'
 })
 
 // ------------
-// Board
+// Board Display
 // ------------
 
-const board = ref([
-  ['bR', 'bN', 'bB', 'bQ', 'bK', 'bB', 'bN', 'bR'],
-  ['bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP', 'bP'],
-  ['', '', '', '', '', '', '', ''],
-  ['', '', '', '', '', '', '', ''],
-  ['', '', '', '', '', '', '', ''],
-  ['', '', '', '', '', '', '', ''],
-  ['wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP', 'wP'],
-  ['wR', 'wN', 'wB', 'wQ', 'wK', 'wB', 'wN', 'wR'],
-])
-
-function boardBackground(
-  rowIndex: number,
-  columnIndex: number,
-  activePiece: ActivePiece | null,
-): string {
+function boardBackground(rowIndex: number, columnIndex: number, activePiece: ActivePiece | null) {
   if (isActiveCell(rowIndex, columnIndex, activePiece)) return 'highlight-cell'
-  else return (rowIndex + columnIndex) % 2 ? 'dark-cell' : 'light-cell'
+  return (rowIndex + columnIndex) % 2 ? 'dark-cell' : 'light-cell'
 }
 
 function getImageUrl(directory: string, name: string, format: string) {
@@ -274,11 +257,6 @@ function getImageUrl(directory: string, name: string, format: string) {
 // ------------
 
 const capturedPieces = ref<Record<'w' | 'b', string[]>>({ w: [], b: [] })
-function maybeAssignCapturedPiece(rowIndex: number, columnIndex: number) {
-  if (board.value[rowIndex]![columnIndex]!.length) {
-    capturedPieces.value[turn.value].push(board.value[rowIndex]![columnIndex]!)
-  }
-}
 
 const groupedCapturedPieces = computed(() => {
   return {
@@ -300,16 +278,17 @@ const capturedScores = computed(() => {
 const promotionPieces = ref<string[]>(['Q', 'R', 'N', 'B'])
 
 const promotionSquare = computed<ActivePiece | null>(() => {
-  const whiteColumn = board.value[0]!.indexOf('wP')
+  const board = game.value.board
+  const whiteColumn = board[0]!.indexOf('wP')
   if (whiteColumn !== -1) return { rowIndex: 0, columnIndex: whiteColumn, piece: 'wP' }
 
-  const blackColumn = board.value[7]!.indexOf('bP')
+  const blackColumn = board[7]!.indexOf('bP')
   if (blackColumn !== -1) return { rowIndex: 7, columnIndex: blackColumn, piece: 'bP' }
 
   return null
 })
 
 function promotePawn(piece: string, square: ActivePiece) {
-  board.value[square.rowIndex]![square.columnIndex] = square.piece[0] + piece
+  game.value.board[square.rowIndex]![square.columnIndex] = square.piece[0] + piece
 }
 </script>
