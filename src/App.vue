@@ -17,12 +17,26 @@
       </div>
     </Modal>
 
+    <Modal v-if="gameStatus !== 'playing'" :closable="false">
+      <template #header>
+        <h3 v-if="gameStatus === 'checkmate'">{{ winner?.colour }} Wins</h3>
+        <h3 v-else>Stalemate</h3>
+      </template>
+
+      <div v-if="gameStatus === 'checkmate'">{{ winner?.player }} wins by checkmate.</div>
+      <div v-else>Draw by stalemate</div>
+
+      <div class="new-game-btn-container">
+        <button class="btn" @click="resetGame()">Play again</button>
+      </div>
+    </Modal>
+
     <div class="board">
       <div class="player-bar">
         <img class="player-avatar" :src="getImageUrl('icons', 'player2', 'png')" alt="player 2" />
 
         <div>
-          <p class="player-name">Player 2</p>
+          <p class="player-name">Player 2 <span v-if="game.turn === 'b'" class="turn-dot" /></p>
 
           <div class="captured-pieces">
             <template v-for="(count, piece) in groupedCapturedPieces.b" :key="piece">
@@ -65,7 +79,7 @@
         <img class="player-avatar" :src="getImageUrl('icons', 'player1', 'png')" alt="player 1" />
 
         <div>
-          <p class="player-name">Player 1</p>
+          <p class="player-name">Player 1 <span v-if="game.turn === 'w'" class="turn-dot" /></p>
           <div class="captured-pieces">
             <template v-for="(count, piece) in groupedCapturedPieces.w" :key="piece">
               <div v-if="count" class="captured-group">
@@ -176,10 +190,6 @@ body {
   border-radius: 10%;
 }
 
-.player-name {
-  margin: 0 0 0 0.5rem;
-}
-
 .captured-group {
   display: flex;
 }
@@ -199,12 +209,50 @@ body {
   border-radius: 50%;
   background-color: rgba(0, 0, 0, 0.1);
 }
+
+.btn {
+  background-color: #04aa6d;
+  border: none;
+  color: white;
+  padding: 10px 22px;
+  border-radius: 5px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+}
+
+.new-game-btn-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.turn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #04aa6d;
+}
+
+.player-name {
+  margin: 0 0 0 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.check-cell {
+  background-color: rgba(220, 50, 50, 0.7);
+}
 </style>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { isPotentialMove, isActiveCell } from './engine/board'
-import { getSafeMoves, hasAnySafeMove, isInCheck } from './engine/moves'
+import { getSafeMoves, hasAnySafeMove, isInCheck, findKing } from './engine/moves'
 import type { ActivePiece, GameState } from './engine/types'
 import { groupByType, getScore } from './engine/scores'
 import Modal from './components/Modal.vue'
@@ -218,7 +266,7 @@ const game = ref<GameState>(initialState())
 const activePiece = ref<ActivePiece | null>(null)
 
 function maybeMovePiece(rowIndex: number, columnIndex: number, piece: string) {
-  if (gameStatus.value !== 'playing') return
+  if (gameStatus.value !== 'playing' || promotionSquare.value) return
 
   if (activePiece.value && isPotentialMove(rowIndex, columnIndex, potentialMoves.value)) {
     const result = makeMove(game.value, activePiece.value, { rowIndex, columnIndex })
@@ -234,9 +282,29 @@ const potentialMoves = computed(() =>
 )
 
 const gameStatus = computed<'playing' | 'checkmate' | 'stalemate'>(() => {
-  const { board, turn } = game.value
+  const { turn } = game.value
   if (hasAnySafeMove(game.value, turn)) return 'playing'
   return isInCheck(game.value, turn) ? 'checkmate' : 'stalemate'
+})
+
+const winner = computed(() => {
+  if (gameStatus.value !== 'checkmate') return null
+  return game.value.turn === 'w'
+    ? { player: 'Player 2', colour: 'Black' }
+    : { player: 'Player 1', colour: 'White' }
+})
+
+function resetGame() {
+  game.value = initialState()
+  capturedPieces.value = { w: [], b: [] }
+  activePiece.value = null
+}
+
+const checkSquare = computed(() => {
+  const { turn } = game.value
+  if (!isInCheck(game.value, turn)) return null
+
+  return findKing(game.value.board, turn)
 })
 
 // ------------
@@ -245,6 +313,9 @@ const gameStatus = computed<'playing' | 'checkmate' | 'stalemate'>(() => {
 
 function boardBackground(rowIndex: number, columnIndex: number, activePiece: ActivePiece | null) {
   if (isActiveCell(rowIndex, columnIndex, activePiece)) return 'highlight-cell'
+  if (checkSquare.value?.rowIndex === rowIndex && checkSquare.value?.columnIndex === columnIndex)
+    return 'check-cell'
+
   return (rowIndex + columnIndex) % 2 ? 'dark-cell' : 'light-cell'
 }
 
