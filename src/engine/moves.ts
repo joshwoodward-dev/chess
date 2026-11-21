@@ -250,7 +250,7 @@ export function getSafeMoves(activePiece: ActivePiece, state: GameState): Square
   })
 }
 
-function findKing(board: Board, colour: string): Square | null {
+export function findKing(board: Board, colour: string): Square | null {
   for (const [rowIndex, row] of Object.entries(board)) {
     for (const [columnIndex, piece] of Object.entries(row)) {
       if (piece.startsWith(colour) && piece.endsWith('K'))
